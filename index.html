@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DayZ Server – Admin To-Do</title>
+<style>
+  :root{
+    --bg:#111416; --panel:#1a1f22; --panel2:#222a2e; --line:#2f393e;
+    --text:#e6ece8; --muted:#8fa09a; --accent:#8fbf4d; --accent2:#5f8a2b;
+    --offen:#3b82f6; --arbeit:#f59e0b; --erledigt:#22c55e; --blockiert:#ef4444;
+    --p-niedrig:#64748b; --p-mittel:#3b82f6; --p-hoch:#f97316; --p-kritisch:#ef4444;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Segoe UI",Roboto,Arial,sans-serif;background:
+    radial-gradient(circle at 15% 0%,#1d2a1a 0,transparent 45%),var(--bg);color:var(--text);min-height:100vh}
+  header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;
+    padding:18px 24px;border-bottom:1px solid var(--line);background:rgba(17,20,22,.85);position:sticky;top:0;z-index:5;backdrop-filter:blur(6px)}
+  h1{margin:0;font-size:1.5rem;letter-spacing:.5px}
+  h1 span{color:var(--accent)}
+  .sync{font-size:.8rem;padding:4px 10px;border-radius:99px;background:var(--panel2);color:var(--muted)}
+  .sync.online{color:#b6f09a;background:#1f3a1a}
+  .me{display:flex;gap:8px;align-items:center;font-size:.9rem;color:var(--muted)}
+  input,select,textarea{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--accent2);border-color:var(--accent2)}
+  button{font:inherit;cursor:pointer;border:none;border-radius:8px;padding:9px 14px;background:var(--panel2);color:var(--text)}
+  button:hover{filter:brightness(1.2)}
+  .primary{background:var(--accent);color:#10150c;font-weight:700}
+  .danger{background:#4a1d1d;color:#ffb4b4}
+  .wrap{padding:20px 24px;max-width:1500px;margin:0 auto}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;border-left:5px solid var(--c)}
+  .stat b{display:block;font-size:1.8rem}
+  .stat small{color:var(--muted)}
+  .progress{height:10px;background:var(--panel2);border-radius:99px;overflow:hidden;margin:-4px 0 18px}
+  .progress div{height:100%;background:linear-gradient(90deg,var(--accent2),var(--erledigt));transition:width .4s}
+  .toolbar{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px}
+  .toolbar input[type=search]{flex:1;min-width:200px}
+  .board{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .col{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;min-height:200px}
+  .col h2{margin:0 0 12px;font-size:1rem;display:flex;justify-content:space-between;align-items:center;
+    padding-bottom:8px;border-bottom:3px solid var(--c)}
+  .col h2 .n{background:var(--c);color:#111;border-radius:99px;padding:1px 9px;font-size:.8rem}
+  .card{background:var(--panel2);border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px;
+    padding:10px 12px;margin-bottom:10px;cursor:pointer;transition:transform .1s}
+  .card:hover{transform:translateY(-2px);border-color:var(--c)}
+  .card h3{margin:0 0 6px;font-size:.98rem}
+  .card.done h3{text-decoration:line-through;opacity:.7}
+  .card p{margin:0 0 8px;color:var(--muted);font-size:.85rem;white-space:pre-wrap}
+  .tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+  .tag{font-size:.72rem;padding:2px 8px;border-radius:99px;background:#2c363b;color:#cfd8d4}
+  .tag.prio{color:#fff;background:var(--pc)}
+  .meta{display:flex;justify-content:space-between;gap:6px;font-size:.75rem;color:var(--muted);flex-wrap:wrap}
+  .overdue{color:#ff8a8a;font-weight:700}
+  .card select{width:100%;margin-top:8px;padding:5px;font-size:.8rem}
+  dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;width:min(560px,94vw);padding:20px}
+  dialog::backdrop{background:rgba(0,0,0,.6)}
+  form .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  form label{display:flex;flex-direction:column;gap:4px;font-size:.82rem;color:var(--muted)}
+  form .full{grid-column:1/-1}
+  .actions{display:flex;justify-content:space-between;gap:8px;margin-top:16px}
+  .history{font-size:.75rem;color:var(--muted);margin-top:10px}
+  @media(max-width:1000px){.board{grid-template-columns:1fr 1fr}}
+  @media(max-width:620px){.board{grid-template-columns:1fr}form .grid{grid-template-columns:1fr}.wrap,header{padding:14px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🧟 DayZ Server <span>Admin To-Do</span></h1>
+  <div class="me">
+    <span id="sync" class="sync">Lokal</span>
+    Du bist: <input id="myName" placeholder="Dein Admin-Name" size="14">
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="stats" id="stats"></div>
+  <div class="progress"><div id="bar" style="width:0"></div></div>
+
+  <div class="toolbar">
+    <input type="search" id="search" placeholder="🔍 Suchen…">
+    <select id="fAdmin"><option value="">Alle Admins</option></select>
+    <select id="fCat"><option value="">Alle Kategorien</option></select>
+    <select id="fPrio"><option value="">Alle Prioritäten</option></select>
+    <button id="btnExport" title="Backup als JSON speichern">⬇ Export</button>
+    <button id="btnImport" title="Backup laden">⬆ Import</button>
+    <input type="file" id="importFile" accept=".json" hidden>
+    <button class="primary" id="btnNew">+ Neue Aufgabe</button>
+  </div>
+
+  <div class="board" id="board"></div>
+</div>
+
+<dialog id="dlg">
+  <form id="form" method="dialog">
+    <h2 id="dlgTitle" style="margin-top:0">Neue Aufgabe</h2>
+    <div class="grid">
+      <label class="full">Titel <input name="title" required placeholder="z. B. Trader auf Chernarus fixen"></label>
+      <label class="full">Beschreibung <textarea name="desc" rows="4" placeholder="Details, Koordinaten, Mod-Namen …"></textarea></label>
+      <label>Status <select name="status"></select></label>
+      <label>Priorität <select name="priority"></select></label>
+      <label>Kategorie <input name="category" list="catList" placeholder="z. B. Mods"></label>
+      <label>Zuständig <input name="assignee" list="adminList" placeholder="Admin-Name"></label>
+      <label>Fällig am <input type="date" name="due"></label>
+    </div>
+    <div class="history" id="history"></div>
+    <div class="actions">
+      <button type="button" class="danger" id="btnDelete">🗑 Löschen</button>
+      <div style="display:flex;gap:8px">
+        <button type="button" id="btnCancel">Abbrechen</button>
+        <button type="submit" class="primary">Speichern</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+<datalist id="catList"></datalist>
+<datalist id="adminList"></datalist>
+
+<script>
+/* =========================================================
+   TEAM-SYNC (optional):
+   Damit dein ganzes Admin-Team dieselben Aufgaben sieht,
+   trage hier deine Firebase-Konfiguration ein (siehe Anleitung).
+   Bleibt es null, wird nur lokal im Browser gespeichert.
+   ========================================================= */
+const FIREBASE_CONFIG = null;
+/* Beispiel:
+const FIREBASE_CONFIG = {
+  apiKey: "...",
+  authDomain: "dein-projekt.firebaseapp.com",
+  databaseURL: "https://dein-projekt-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "dein-projekt",
+};
+*/
+
+const STATUSES = [
+  {id:"offen",     label:"📋 Offen",          color:"var(--offen)"},
+  {id:"arbeit",    label:"🔧 In Bearbeitung", color:"var(--arbeit)"},
+  {id:"blockiert", label:"⛔ Blockiert",      color:"var(--blockiert)"},
+  {id:"erledigt",  label:"✅ Erledigt",       color:"var(--erledigt)"},
+];
+const PRIOS = [
+  {id:"niedrig",  label:"Niedrig",  color:"var(--p-niedrig)"},
+  {id:"mittel",   label:"Mittel",   color:"var(--p-mittel)"},
+  {id:"hoch",     label:"Hoch",     color:"var(--p-hoch)"},
+  {id:"kritisch", label:"Kritisch", color:"var(--p-kritisch)"},
+];
+const DEFAULT_CATS = ["Mods","Loot / Economy","Map / Basen","Events","Bugs","Trader","Discord","Regeln"];
+
+let tasks = {};
+let editingId = null;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = ts => ts ? new Date(ts).toLocaleString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "–";
+const fmtDate = d => d ? new Date(d+"T00:00").toLocaleDateString("de-DE") : "";
+
+/* ---------- Speicher ---------- */
+const store = {
+  db:null,
+  async init(){
+    if (FIREBASE_CONFIG){
+      try{
+        await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js");
+        await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js");
+        firebase.initializeApp(FIREBASE_CONFIG);
+        this.db = firebase.database().ref("dayz-todos");
+        this.db.on("value", snap => { tasks = snap.val() || {}; render(); });
+        firebase.database().ref(".info/connected").on("value", s => {
+          const el = $("#sync");
+          el.textContent = s.val() ? "🟢 Team-Sync aktiv" : "🔴 Offline";
+          el.classList.toggle("online", !!s.val());
+        });
+        return;
+      }catch(e){ console.error(e); alert("Firebase konnte nicht geladen werden – nutze lokalen Speicher."); this.db=null; }
+    }
+    try{ tasks = JSON.parse(localStorage.getItem("dayz-todos")||"{}"); }catch{ tasks = {}; }
+    $("#sync").textContent = "💾 Nur lokal";
+    render();
+  },
+  save(t){ tasks[t.id]=t; this.db ? this.db.child(t.id).set(t) : this.persist(); render(); },
+  remove(id){ delete tasks[id]; this.db ? this.db.child(id).remove() : this.persist(); render(); },
+  replaceAll(obj){ tasks=obj; this.db ? this.db.set(obj) : this.persist(); render(); },
+  persist(){ try{ localStorage.setItem("dayz-todos", JSON.stringify(tasks)); }catch{} }
+};
+function loadScript(src){ return new Promise((ok,err)=>{ const s=document.createElement("script"); s.src=src; s.onload=ok; s.onerror=err; document.head.appendChild(s); }); }
+
+/* ---------- Name ---------- */
+const myName = () => $("#myName").value.trim() || "Unbekannt";
+try{ $("#myName").value = localStorage.getItem("dayz-myname")||""; }catch{}
+$("#myName").addEventListener("input", e => { try{ localStorage.setItem("dayz-myname", e.target.value); }catch{} });
+
+/* ---------- Rendern ---------- */
+function render(){
+  const list = Object.values(tasks);
+  const q = $("#search").value.toLowerCase(), fa=$("#fAdmin").value, fc=$("#fCat").value, fp=$("#fPrio").value;
+  const today = new Date().toISOString().slice(0,10);
+
+  // Filter-Optionen auffüllen
+  const admins = [...new Set(list.map(t=>t.assignee).filter(Boolean))].sort();
+  const cats = [...new Set([...DEFAULT_CATS, ...list.map(t=>t.category).filter(Boolean)])].sort();
+  fillSelect("#fAdmin","Alle Admins",admins,fa);
+  fillSelect("#fCat","Alle Kategorien",cats,fc);
+  $("#adminList").innerHTML = admins.map(a=>`<option value="${esc(a)}">`).join("");
+  $("#catList").innerHTML = cats.map(c=>`<option value="${esc(c)}">`).join("");
+
+  // Statistik
+  const done = list.filter(t=>t.status==="erledigt").length;
+  const overdue = list.filter(t=>t.due && t.due<today && t.status!=="erledigt").length;
+  $("#stats").innerHTML =
+    STATUSES.map(s=>`<div class="stat" style="--c:${s.color}"><b>${list.filter(t=>t.status===s.id).length}</b><small>${s.label}</small></div>`).join("") +
+    `<div class="stat" style="--c:#ff6b6b"><b>${overdue}</b><small>⏰ Überfällig</small></div>`;
+  $("#bar").style.width = list.length ? (done/list.length*100)+"%" : "0";
+
+  const prioRank = id => PRIOS.findIndex(p=>p.id===id);
+  const visible = list.filter(t =>
+    (!fa || t.assignee===fa) && (!fc || t.category===fc) && (!fp || t.priority===fp) &&
+    (!q || (t.title+" "+(t.desc||"")+" "+(t.assignee||"")).toLowerCase().includes(q))
+  ).sort((a,b)=> prioRank(b.priority)-prioRank(a.priority) || (a.due||"9999").localeCompare(b.due||"9999"));
+
+  $("#board").innerHTML = STATUSES.map(s=>{
+    const items = visible.filter(t=>t.status===s.id);
+    return `<section class="col" style="--c:${s.color}">
+      <h2>${s.label}<span class="n">${items.length}</span></h2>
+      ${items.map(t=>card(t,s,today)).join("") || `<div style="color:var(--muted);font-size:.85rem">Keine Aufgaben</div>`}
+    </section>`;
+  }).join("");
+}
+function card(t,s,today){
+  const p = PRIOS.find(x=>x.id===t.priority)||PRIOS[1];
+  const late = t.due && t.due<today && t.status!=="erledigt";
+  return `<div class="card ${t.status==="erledigt"?"done":""}" style="--c:${s.color}" data-id="${esc(t.id)}">
+    <h3>${esc(t.title)}</h3>
+    <div class="tags">
+      <span class="tag prio" style="--pc:${p.color}">${p.label}</span>
+      ${t.category?`<span class="tag">${esc(t.category)}</span>`:""}
+      ${t.assignee?`<span class="tag">👤 ${esc(t.assignee)}</span>`:""}
+    </div>
+    ${t.desc?`<p>${esc(t.desc.length>140?t.desc.slice(0,140)+"…":t.desc)}</p>`:""}
+    <div class="meta">
+      <span class="${late?"overdue":""}">${t.due?(late?"⏰ ":"📅 ")+fmtDate(t.due):""}</span>
+      <span>✏ ${esc(t.updatedBy||"")} · ${fmt(t.updated)}</span>
+    </div>
+    <select data-quick="${esc(t.id)}" onclick="event.stopPropagation()">
+      ${STATUSES.map(x=>`<option value="${x.id}" ${x.id===t.status?"selected":""}>${x.label}</option>`).join("")}
+    </select>
+  </div>`;
+}
+function fillSelect(sel,first,vals,cur){
+  $(sel).innerHTML = `<option value="">${first}</option>` + vals.map(v=>`<option ${v===cur?"selected":""}>${esc(v)}</option>`).join("");
+}
+fillSelect("#fPrio","Alle Prioritäten",[],"");
+$("#fPrio").innerHTML = `<option value="">Alle Prioritäten</option>` + PRIOS.map(p=>`<option value="${p.id}">${p.label}</option>`).join("");
+
+/* ---------- Events ---------- */
+["#search","#fAdmin","#fCat","#fPrio"].forEach(s=>$(s).addEventListener("input",render));
+
+$("#board").addEventListener("click", e=>{
+  const c = e.target.closest(".card"); if (c) openEditor(c.dataset.id);
+});
+$("#board").addEventListener("change", e=>{
+  const id = e.target.dataset.quick; if (!id) return;
+  const t = {...tasks[id], status:e.target.value, updated:Date.now(), updatedBy:myName()};
+  t.log = [...(t.log||[]), {at:t.updated, by:t.updatedBy, what:"Status → "+label(t.status)}].slice(-20);
+  store.save(t);
+});
+const label = id => (STATUSES.find(s=>s.id===id)||{}).label || id;
+
+const form = $("#form");
+form.status.innerHTML = STATUSES.map(s=>`<option value="${s.id}">${s.label}</option>`).join("");
+form.priority.innerHTML = PRIOS.map(p=>`<option value="${p.id}">${p.label}</option>`).join("");
+
+function openEditor(id){
+  editingId = id || null;
+  const t = id ? tasks[id] : {status:"offen", priority:"mittel", assignee:myName()==="Unbekannt"?"":myName()};
+  $("#dlgTitle").textContent = id ? "Aufgabe bearbeiten" : "Neue Aufgabe";
+  ["title","desc","status","priority","category","assignee","due"].forEach(k=> form[k].value = t[k]||"");
+  $("#btnDelete").style.visibility = id ? "visible" : "hidden";
+  $("#history").innerHTML = id ?
+    `Erstellt von <b>${esc(t.createdBy)}</b> am ${fmt(t.created)}<br>` +
+    (t.log||[]).slice().reverse().map(l=>`• ${fmt(l.at)} – ${esc(l.by)}: ${esc(l.what)}`).join("<br>") : "";
+  $("#dlg").showModal();
+}
+$("#btnNew").onclick = ()=>openEditor();
+$("#btnCancel").onclick = ()=>$("#dlg").close();
+$("#btnDelete").onclick = ()=>{
+  if (editingId && confirm("Aufgabe wirklich löschen?")){ store.remove(editingId); $("#dlg").close(); }
+};
+form.addEventListener("submit", e=>{
+  e.preventDefault();
+  const now = Date.now(), old = editingId ? tasks[editingId] : null;
+  const t = {
+    ...(old||{}),
+    id: editingId || ("t"+now.toString(36)+Math.random().toString(36).slice(2,6)),
+    title: form.title.value.trim(), desc: form.desc.value.trim(),
+    status: form.status.value, priority: form.priority.value,
+    category: form.category.value.trim(), assignee: form.assignee.value.trim(),
+    due: form.due.value || "",
+    created: old?.created || now, createdBy: old?.createdBy || myName(),
+    updated: now, updatedBy: myName(),
+  };
+  const what = !old ? "erstellt" : (old.status!==t.status ? "Status → "+label(t.status) : "bearbeitet");
+  t.log = [...(old?.log||[]), {at:now, by:myName(), what}].slice(-20);
+  store.save(t);
+  $("#dlg").close();
+});
+
+/* ---------- Backup ---------- */
+$("#btnExport").onclick = ()=>{
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(tasks,null,2)],{type:"application/json"}));
+  a.download = "dayz-todos-"+new Date().toISOString().slice(0,10)+".json"; a.click();
+};
+$("#btnImport").onclick = ()=>$("#importFile").click();
+$("#importFile").onchange = async e=>{
+  const f = e.target.files[0]; if (!f) return;
+  try{ const data = JSON.parse(await f.text()); if (confirm("Alle aktuellen Aufgaben ersetzen?")) store.replaceAll(data); }
+  catch{ alert("Ungültige Datei."); }
+  e.target.value="";
+};
+
+store.init();
+</script>
+</body>
+</html>
