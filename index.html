@@ -123,7 +123,12 @@
    trage hier deine Firebase-Konfiguration ein (siehe Anleitung).
    Bleibt es null, wird nur lokal im Browser gespeichert.
    ========================================================= */
-const FIREBASE_CONFIG = null;
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyB5_RC-2Jqp8zwp1NqbxmOlvEjJdyXcROM",
+  authDomain: "team-admin-a2320.firebaseapp.com",
+  databaseURL: "https://team-admin-a2320-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "team-admin-a2320",
+};
 /* Beispiel:
 const FIREBASE_CONFIG = {
   apiKey: "...",
@@ -171,10 +176,10 @@ const store = {
           el.classList.toggle("online", !!s.val());
         });
         return;
-      }catch(e){ console.error(e); alert("Firebase konnte nicht geladen werden – nutze lokalen Speicher."); this.db=null; }
+      }catch(e){ console.error(e); this.error = (e && e.message) || (e && e.target && e.target.src ? "Skript blockiert: "+e.target.src : String(e)); this.db=null; }
     }
     try{ tasks = JSON.parse(localStorage.getItem("dayz-todos")||"{}"); }catch{ tasks = {}; }
-    $("#sync").textContent = "💾 Nur lokal";
+    $("#sync").textContent = this.error ? "⚠ Firebase-Fehler: "+this.error : (FIREBASE_CONFIG ? "💾 Nur lokal" : "💾 Nur lokal (keine Firebase-Config)");
     render();
   },
   save(t){ tasks[t.id]=t; this.db ? this.db.child(t.id).set(t) : this.persist(); render(); },
